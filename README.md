@@ -1,39 +1,39 @@
--- ESP Configuração
 local ESP_ENABLED = true
 local TEAM_CHECK = true
-local ESP_RANGE = 300.0 -- Distância máxima para mostrar
+local ESP_RANGE = 300.0
 
--- Cores por time (TeamID como exemplo)
 local teamColors = {
-    [1] = {r = 0, g = 255, b = 0},   -- Verde para time 1
-    [2] = {r = 255, g = 0, b = 0},   -- Vermelho para time 2
-    [0] = {r = 255, g = 255, b = 255} -- Branco para jogadores sem time
+    [1] = {r = 0, g = 255, b = 0},     -- Time 1: Verde
+    [2] = {r = 255, g = 0, b = 0},     -- Time 2: Vermelho
+    [0] = {r = 255, g = 255, b = 255}  -- Outro: Branco
 }
 
--- Simulação para pegar o Team ID (substitua com a função do seu jogo)
+-- Função de exemplo para pegar o time do jogador (modifique conforme seu sistema)
 function GetPlayerTeam(playerId)
-    -- Aqui você deveria usar a API do seu jogo para obter o time do jogador
-    return GetPedRelationshipGroupHash(GetPlayerPed(playerId)) % 3 -- Exemplo genérico
+    return GetPedRelationshipGroupHash(GetPlayerPed(playerId)) % 3
 end
 
--- Função para desenhar texto na tela
+-- Corrigida: desenha texto 2D baseado na posição 3D do jogador
 function DrawText3D(x, y, z, text, color)
-    SetTextScale(0.35, 0.35)
-    SetTextFont(4)
-    SetTextProportional(1)
-    SetTextColour(color.r, color.g, color.b, 215)
-    SetTextEntry("STRING")
-    SetTextCentre(true)
-    AddTextComponentString(text)
-    SetDrawOrigin(x, y, z + 1.0, 0)
-    DrawText(0.0, 0.0)
-    ClearDrawOrigin()
+    local onScreen, _x, _y = World3dToScreen2d(x, y, z + 1.0)
+    local px, py, pz = table.unpack(GetGameplayCamCoords())
+    
+    if onScreen then
+        SetTextScale(0.35, 0.35)
+        SetTextFont(4)
+        SetTextProportional(1)
+        SetTextColour(color.r, color.g, color.b, 255)
+        SetTextEntry("STRING")
+        SetTextCentre(true)
+        AddTextComponentString(text)
+        DrawText(_x, _y)
+    end
 end
 
--- Loop principal
+-- ESP loop
 Citizen.CreateThread(function()
     while true do
-        Wait(1)
+        Wait(0)
         if ESP_ENABLED then
             local myPed = PlayerPedId()
             local myCoords = GetEntityCoords(myPed)
@@ -41,16 +41,18 @@ Citizen.CreateThread(function()
 
             for i = 0, 255 do
                 if NetworkIsPlayerActive(i) and i ~= PlayerId() then
-                    local ped = GetPlayerPed(i)
-                    local pedCoords = GetEntityCoords(ped)
-                    local dist = #(myCoords - pedCoords)
-
-                    if dist < ESP_RANGE then
-                        local team = GetPlayerTeam(i)
-                        if not TEAM_CHECK or team ~= myTeam then
-                            local color = teamColors[team] or teamColors[0]
-                            local name = GetPlayerName(i)
-                            DrawText3D(pedCoords.x, pedCoords.y, pedCoords.z, name, color)
+                    local targetPed = GetPlayerPed(i)
+                    if DoesEntityExist(targetPed) then
+                        local targetCoords = GetEntityCoords(targetPed)
+                        local dist = #(myCoords - targetCoords)
+                        
+                        if dist < ESP_RANGE then
+                            local targetTeam = GetPlayerTeam(i)
+                            if not TEAM_CHECK or targetTeam ~= myTeam then
+                                local color = teamColors[targetTeam] or teamColors[0]
+                                local name = GetPlayerName(i)
+                                DrawText3D(targetCoords.x, targetCoords.y, targetCoords.z, name, color)
+                            end
                         end
                     end
                 end
